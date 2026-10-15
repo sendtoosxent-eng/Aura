@@ -21,6 +21,12 @@ mkdir -p \
 
 chown -R www-data:www-data storage bootstrap/cache
 
+if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
+    database_path="${DB_DATABASE:-/var/www/html/storage/app/afyalink.sqlite}"
+    touch "${database_path}"
+    chown www-data:www-data "${database_path}"
+fi
+
 php artisan migrate --force
 php artisan config:cache
 php artisan route:cache

@@ -20,13 +20,9 @@ services:
       - key: RENDER_APP_SECRET
         generateValue: true
       - key: DB_CONNECTION
-        value: pgsql
-      - key: DB_URL
-        fromDatabase:
-          name: afyalink-postgres
-          property: connectionString
-      - key: DB_SSLMODE
-        value: require
+        value: sqlite
+      - key: DB_DATABASE
+        value: /var/www/html/storage/app/afyalink.sqlite
       - key: LOG_CHANNEL
         value: stderr
       - key: LOG_LEVEL
@@ -41,10 +37,3 @@ services:
         value: local
       - key: AFYALINK_SMS_DRIVER
         value: log
-
-databases:
-  - name: afyalink-postgres
-    plan: free
-    region: frankfurt
-    databaseName: afyalink
-    user: afyalink

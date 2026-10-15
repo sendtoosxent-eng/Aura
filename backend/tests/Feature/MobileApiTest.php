@@ -469,3 +469,9 @@ test('patients can book and the assigned professional can manage an appointment'
         ->assertOk()->assertJsonPath('data.status', 'confirmed')
         ->assertJsonPath('data.patient.name', $patient->name);
 });
+test('mobile API generates secure links behind the production proxy', function () {
+    $this->withHeader('X-Forwarded-Proto', 'https')
+        ->getJson('/api/v1/providers')
+        ->assertOk()
+        ->assertJsonPath('path', fn (string $path): bool => str_starts_with($path, 'https://'));
+});

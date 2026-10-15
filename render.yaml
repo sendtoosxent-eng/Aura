@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: afyalink-api-uganda
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_NAME
+        value: AfyaLink Uganda
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://afyalink-api-uganda.onrender.com
+      - key: RENDER_APP_SECRET
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: afyalink-postgres
+          property: connectionString
+      - key: DB_SSLMODE
+        value: require
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: CACHE_STORE
+        value: database
+      - key: SESSION_DRIVER
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: FILESYSTEM_DISK
+        value: local
+      - key: AFYALINK_SMS_DRIVER
+        value: log
+
+databases:
+  - name: afyalink-postgres
+    plan: free
+    region: frankfurt
+    databaseName: afyalink
+    user: afyalink

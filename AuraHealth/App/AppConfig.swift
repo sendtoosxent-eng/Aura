@@ -13,7 +13,7 @@ enum AppConfig {
     static var apiBaseURL: URL {
         let configured = ProcessInfo.processInfo.environment["AFYALINK_API_BASE_URL"]
             ?? UserDefaults.standard.string(forKey: "AFYALINK_API_BASE_URL")
-            ?? "http://127.0.0.1:8000/api/v1/"
+            ?? "https://afyalink-api-uganda.onrender.com/api/v1/"
         let normalized = configured.hasSuffix("/") ? configured : configured + "/"
         return URL(string: normalized)!
     }

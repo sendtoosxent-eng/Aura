@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RegistrationApplication;
 use App\Models\User;
+use Illuminate\Support\Facades\URL;
 
 class MobileProfileService
 {
@@ -14,6 +15,9 @@ class MobileProfileService
         $displayName = $user->account_type === 'facility'
             ? ($application?->facility_name ?: $user->name)
             : $user->name;
+        $hasProfilePhoto = $user->account_type === 'patient'
+            ? filled($user->patientProfile?->profile_photo)
+            : filled($application?->profile_photo);
 
         return [
             'id' => $user->id,
@@ -29,6 +33,9 @@ class MobileProfileService
             'account_type' => $user->account_type ?: 'patient',
             'profile_id' => $user->registration_number ?: sprintf('PAT-%06d', $user->id),
             'registration_status' => $user->registration_status,
+            'profile_photo_url' => $hasProfilePhoto
+                ? URL::temporarySignedRoute('api.auth.profile-photo', now()->addMinutes(5), ['user' => $user])
+                : null,
         ];
     }
 

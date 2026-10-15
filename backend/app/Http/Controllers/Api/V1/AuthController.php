@@ -10,10 +10,25 @@ use App\Services\MobileProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuthController extends Controller
 {
+    public function profilePhoto(User $user): StreamedResponse
+    {
+        $path = $user->account_type === 'patient'
+            ? $user->patientProfile?->profile_photo
+            : $user->registrationApplications()->latest('id')->value('profile_photo');
+
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, headers: [
+            'Cache-Control' => 'private, max-age=300',
+        ]);
+    }
+
     public function lookup(
         Request $request,
         LoginSecurityService $security,

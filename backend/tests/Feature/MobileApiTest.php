@@ -201,12 +201,15 @@ test('patient registration persists the profile and restores every saved detail 
         ->assertJsonPath('data.phone_verified', true);
     expect($user->fresh()->phone_verified_at)->not->toBeNull();
 
-    $this->postJson('/api/v1/auth/lookup', [
+    $lookup = $this->postJson('/api/v1/auth/lookup', [
         'phone' => $user->phone,
         'role' => 'patient',
         'device_id' => 'returning-patient-device',
     ])->assertOk()
-        ->assertJsonMissingPath('data.patient_profile');
+        ->assertJsonMissingPath('data.patient_profile')
+        ->assertJsonPath('data.profile_photo_url', fn (?string $url): bool => filled($url));
+
+    $this->get($lookup->json('data.profile_photo_url'))->assertOk();
 
     $this->postJson('/api/v1/auth/login', [
         'phone' => $user->phone,
@@ -279,6 +282,15 @@ test('provider identity API creates a private draft and mobile token', function 
         ->and($user->tokens()->count())->toBe(1);
     Storage::disk('local')->assertExists($application->profile_photo);
     Notification::assertSentTo($user, VerifyEmail::class);
+
+    $lookup = $this->postJson('/api/v1/auth/lookup', [
+        'phone' => $user->phone,
+        'role' => 'provider',
+        'device_id' => 'facility-lookup-device',
+    ])->assertOk()
+        ->assertJsonPath('data.profile_photo_url', fn (?string $url): bool => filled($url));
+
+    $this->get($lookup->json('data.profile_photo_url'))->assertOk();
 });
 
 test('provider can complete the mobile verification and application flow', function () {

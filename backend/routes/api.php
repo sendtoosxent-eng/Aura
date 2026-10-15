@@ -24,6 +24,10 @@ Route::prefix('v1')->group(function (): void {
 
     Route::prefix('auth')->middleware('throttle:10,1')->group(function (): void {
         Route::post('/lookup', [AuthController::class, 'lookup']);
+        Route::get('/profile-photo/{user}', [AuthController::class, 'profilePhoto'])
+            ->middleware('signed')
+            ->whereNumber('user')
+            ->name('api.auth.profile-photo');
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/login/verify', [AuthController::class, 'verifyLogin']);
         Route::post('/login/resend', [AuthController::class, 'resendLoginCode']);

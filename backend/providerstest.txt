@@ -1,0 +1,57 @@
+Facility:
+Kampala Family Medical Centre
+
+Registration Number:
+AFY-FAC-2026-000101
+
+Password:
+Password123!
+
+Account Type:
+Healthcare Facility
+
+District:
+Kampala
+
+Town:
+Ntinda
+
+Administrator:
+Sarah Nabirye
+
+Status:
+Verified
+
+
+
+Health Professional:
+Dr. Daniel Kato
+
+Registration Number:
+AFY-PRO-2026-000102
+
+Password:
+Password123!
+
+Profession:
+Doctor
+
+Specialty:
+General Medicine
+
+Workplace:
+Kampala Family Medical Centre
+
+District:
+Kampala
+
+Status:
+Verified
+
+
+
+| Account | Phone | Password | Login type |
+|---|---|---|---|
+| Patient — Musa Balondemu | `+256700555666` | `Password123!` | I’m a User |
+| Provider — Dr. Daniel Kato | `+256700333444` | `Password123!` | I’m a Health Provider |
+| Facility — Kampala Family Medical Centre | `+256700111222` | `Password123!` | I’m a Health Provider |

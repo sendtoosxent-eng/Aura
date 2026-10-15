@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Xcode user and build state
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+xcuserdata/
+*.moved-aside
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+
+# Editor state
+.idea/
+.vscode/
+*.swp
+
+# JavaScript dependencies and logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+

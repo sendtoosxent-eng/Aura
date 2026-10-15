@@ -12,6 +12,7 @@ struct AuthProfileDTO: Decodable {
     let profileId: String
     let registrationStatus: String?
     let requiresSecurityOtp: Bool?
+    let twoFactorEnabled: Bool?
     let patientProfile: PatientProfileDTO?
     let providerProfile: ProviderProfileDTO?
 }
@@ -153,6 +154,8 @@ struct LookupRequest: Encodable {
     let role: String
     let deviceId: String
 }
+
+private struct TwoFactorRequest: Encodable { let enabled: Bool }
 
 struct ProviderDTO: Decodable {
     let id: Int
@@ -428,6 +431,16 @@ final class AfyaLinkAPI: @unchecked Sendable {
     func currentProfile() async throws -> AuthProfile {
         let response: DataEnvelope<AuthProfileDTO> = try await client.send(
             "auth/me",
+            authenticated: true
+        )
+        return response.data.profile(role: response.data.inferredRole)
+    }
+
+    func updateTwoFactor(enabled: Bool) async throws -> AuthProfile {
+        let response: DataEnvelope<AuthProfileDTO> = try await client.send(
+            "auth/two-factor",
+            method: "PATCH",
+            body: TwoFactorRequest(enabled: enabled),
             authenticated: true
         )
         return response.data.profile(role: response.data.inferredRole)
@@ -805,6 +818,7 @@ private extension AuthProfileDTO {
             registrationStatus: registrationStatus,
             role: role,
             requiresSecurityOTP: requiresSecurityOtp ?? false,
+            twoFactorEnabled: twoFactorEnabled ?? false,
             patientProfile: patientProfile?.profile,
             providerProfile: providerProfile?.profile
         )

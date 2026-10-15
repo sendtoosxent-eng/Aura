@@ -45,6 +45,7 @@ class MobileProfileService
             'nin' => $user->nin,
             'email_verified' => $user->hasVerifiedEmail(),
             'phone_verified' => $user->phone_verified_at !== null,
+            'two_factor_enabled' => $user->two_factor_enabled,
             'patient_profile' => $this->patientProfile($user),
             'provider_profile' => $application ? $this->providerProfile($application) : null,
         ];

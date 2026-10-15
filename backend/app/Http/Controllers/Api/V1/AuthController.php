@@ -33,7 +33,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => $profiles->safe($user) + [
-                'requires_security_otp' => ! $security->isTrusted(
+                'requires_security_otp' => $user->two_factor_enabled && ! $security->isTrusted(
                     $user,
                     $request->ip() ?? 'unknown',
                     $data['device_id'],
@@ -63,7 +63,7 @@ class AuthController extends Controller
 
         $ipAddress = $request->ip() ?? 'unknown';
 
-        if (! $security->isTrusted($user, $ipAddress, $data['device_id'])) {
+        if ($user->two_factor_enabled && ! $security->isTrusted($user, $ipAddress, $data['device_id'])) {
             $result = $security->createChallenge(
                 $user,
                 $ipAddress,
@@ -146,6 +146,26 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Logged out.']);
+    }
+
+    public function updateTwoFactor(Request $request, MobileProfileService $profiles): JsonResponse
+    {
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+        $user = $request->user();
+        $user->update(['two_factor_enabled' => $data['enabled']]);
+
+        if (! $user->two_factor_enabled) {
+            $user->loginVerifications()->whereNull('verified_at')->delete();
+        }
+
+        return response()->json([
+            'message' => $user->two_factor_enabled
+                ? 'Two-factor authentication is on.'
+                : 'Two-factor authentication is off.',
+            'data' => $profiles->authenticated($user->fresh()),
+        ]);
     }
 
     private function tokenResponse(

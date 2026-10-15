@@ -122,6 +122,7 @@ final class AppState {
     var userEmail = ""
     var userNIN = ""
     var healthID = "UG-9421"
+    var twoFactorEnabled = false
     var patientProfile: PatientAuthProfile?
     var profilePhotoData: Data?
     var coverPhotoData: Data?
@@ -419,6 +420,11 @@ final class AppState {
         demoPasswordsByPhone[phone] = password
     }
 
+    func updateTwoFactor(enabled: Bool) async throws {
+        let profile = try await api.updateTwoFactor(enabled: enabled)
+        twoFactorEnabled = profile.twoFactorEnabled
+    }
+
     func prepareLogin(for profile: AuthProfile) {
         currentRole = profile.role
         userName = profile.name
@@ -427,6 +433,7 @@ final class AppState {
         userEmail = profile.email ?? ""
         userNIN = profile.nin ?? ""
         healthID = profile.profileID
+        twoFactorEnabled = profile.twoFactorEnabled
         patientProfile = profile.patientProfile
 
         if let patient = profile.patientProfile {

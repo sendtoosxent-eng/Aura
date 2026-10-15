@@ -2,14 +2,30 @@ import SwiftUI
 
 struct SecurityView: View {
     @Environment(AppState.self) private var appState
-    @State private var twoFactorEnabled = true
+    @State private var twoFactorEnabled = false
     @State private var loginAlerts = true
     @State private var sessionToRemove: TrustedSession?
+    @State private var isSavingTwoFactor = false
+    @State private var twoFactorError: String?
 
     var body: some View {
         List {
             Section("Sign-in protection") {
                 Toggle("Two-factor authentication", isOn: $twoFactorEnabled)
+                    .disabled(isSavingTwoFactor)
+                    .onChange(of: twoFactorEnabled) { _, enabled in
+                        guard enabled != appState.twoFactorEnabled else { return }
+                        isSavingTwoFactor = true
+                        Task {
+                            do {
+                                try await appState.updateTwoFactor(enabled: enabled)
+                            } catch {
+                                twoFactorEnabled = appState.twoFactorEnabled
+                                twoFactorError = error.localizedDescription
+                            }
+                            isSavingTwoFactor = false
+                        }
+                    }
                 Toggle("New device and IP alerts", isOn: $loginAlerts)
                 NavigationLink {
                     ForgotPasswordView(phone: appState.userPhone)
@@ -60,6 +76,17 @@ struct SecurityView: View {
         .navigationTitle("Security & Privacy")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppColor.primary)
+        .task {
+            twoFactorEnabled = appState.twoFactorEnabled
+        }
+        .alert("Could not update two-factor authentication", isPresented: Binding(
+            get: { twoFactorError != nil },
+            set: { if !$0 { twoFactorError = nil } }
+        )) {
+            Button("OK", role: .cancel) { twoFactorError = nil }
+        } message: {
+            Text(twoFactorError ?? "Please try again.")
+        }
         .confirmationDialog(
             "Remove this trusted device?",
             isPresented: Binding(get: { sessionToRemove != nil }, set: { if !$0 { sessionToRemove = nil } }),

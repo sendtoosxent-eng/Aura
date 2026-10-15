@@ -48,6 +48,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::patch('/auth/two-factor', [AuthController::class, 'updateTwoFactor']);
 
         Route::put('/push/devices', [PushDeviceController::class, 'update']);
         Route::delete('/push/devices', [PushDeviceController::class, 'destroy']);

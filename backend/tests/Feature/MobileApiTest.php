@@ -19,12 +19,13 @@ use Laravel\Sanctum\Sanctum;
 
 uses(LazilyRefreshDatabase::class);
 
-test('mobile login returns a safe profile then verifies an untrusted device', function () {
+test('mobile login verifies an untrusted device when two-factor authentication is enabled', function () {
     $user = User::factory()->create([
         'name' => 'Musa Balondemu',
         'phone' => '+256700111222',
         'account_type' => 'patient',
         'password' => Hash::make('Strong!Pass1'),
+        'two_factor_enabled' => true,
     ]);
 
     $this->postJson('/api/v1/auth/lookup', [
@@ -70,6 +71,7 @@ test('mobile login can resend a code after the cooldown', function () {
         'phone' => '+256700111223',
         'account_type' => 'patient',
         'password' => Hash::make('Strong!Pass1'),
+        'two_factor_enabled' => true,
     ]);
 
     $login = $this->postJson('/api/v1/auth/login', [
@@ -87,6 +89,58 @@ test('mobile login can resend a code after the cooldown', function () {
     ])->assertOk()->assertJsonStructure(['challenge_id', 'expires_at']);
 
     expect($resend->json('challenge_id'))->not->toBe($login->json('challenge_id'));
+});
+
+test('mobile login skips otp by default', function () {
+    $user = User::factory()->create([
+        'phone' => '+256700111225',
+        'account_type' => 'patient',
+        'password' => Hash::make('Strong!Pass1'),
+    ]);
+
+    $this->postJson('/api/v1/auth/lookup', [
+        'phone' => $user->phone,
+        'role' => 'patient',
+        'device_id' => 'password-only-device',
+    ])->assertOk()
+        ->assertJsonPath('data.requires_security_otp', false);
+
+    $this->postJson('/api/v1/auth/login', [
+        'phone' => $user->phone,
+        'password' => 'Strong!Pass1',
+        'role' => 'patient',
+        'device_id' => 'password-only-device',
+        'device_name' => 'Musa iPhone',
+    ])->assertOk()
+        ->assertJsonPath('requires_security_otp', false)
+        ->assertJsonStructure(['access_token', 'data']);
+
+    expect(LoginVerification::query()->whereBelongsTo($user)->exists())->toBeFalse();
+});
+
+test('authenticated users can turn two-factor authentication on and off', function () {
+    $user = User::factory()->create();
+    Sanctum::actingAs($user);
+
+    $this->patchJson('/api/v1/auth/two-factor', ['enabled' => true])
+        ->assertOk()
+        ->assertJsonPath('data.two_factor_enabled', true);
+    expect($user->fresh()->two_factor_enabled)->toBeTrue();
+
+    $this->patchJson('/api/v1/auth/two-factor', ['enabled' => false])
+        ->assertOk()
+        ->assertJsonPath('data.two_factor_enabled', false);
+    expect($user->fresh()->two_factor_enabled)->toBeFalse();
+});
+
+test('two-factor settings require authentication and a boolean value', function () {
+    $this->patchJson('/api/v1/auth/two-factor', ['enabled' => true])
+        ->assertUnauthorized();
+
+    Sanctum::actingAs(User::factory()->create());
+    $this->patchJson('/api/v1/auth/two-factor', ['enabled' => 'sometimes'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('enabled');
 });
 
 test('patient registration persists the profile and restores every saved detail after login', function () {
@@ -154,22 +208,14 @@ test('patient registration persists the profile and restores every saved detail 
     ])->assertOk()
         ->assertJsonMissingPath('data.patient_profile');
 
-    $login = $this->postJson('/api/v1/auth/login', [
+    $this->postJson('/api/v1/auth/login', [
         'phone' => $user->phone,
         'password' => 'Strong!Pass1',
         'role' => 'patient',
         'device_id' => 'returning-patient-device',
         'device_name' => 'Musa new iPhone',
-    ])->assertStatus(202);
-    $challenge = LoginVerification::query()->findOrFail($login->json('challenge_id'));
-    $challenge->update(['token_hash' => Hash::make('123456')]);
-
-    $this->postJson('/api/v1/auth/login/verify', [
-        'challenge_id' => $challenge->id,
-        'otp' => '123456',
-        'device_id' => 'returning-patient-device',
-        'device_name' => 'Musa new iPhone',
     ])->assertOk()
+        ->assertJsonPath('requires_security_otp', false)
         ->assertJsonPath('data.patient_profile.blood_group', 'O+')
         ->assertJsonPath('data.patient_profile.systolic', 120)
         ->assertJsonPath('data.patient_profile.diastolic', 80)
@@ -186,6 +232,7 @@ test('login reports missing real sms credentials without leaving a challenge', f
         'phone' => '+256700111224',
         'account_type' => 'patient',
         'password' => Hash::make('Strong!Pass1'),
+        'two_factor_enabled' => true,
     ]);
 
     $this->postJson('/api/v1/auth/login', [

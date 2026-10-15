@@ -15,6 +15,7 @@ struct AuthProfile: Equatable {
     let registrationStatus: String?
     let role: UserRole
     let requiresSecurityOTP: Bool
+    let twoFactorEnabled: Bool
     let patientProfile: PatientAuthProfile?
     let providerProfile: ProviderAuthProfile?
 

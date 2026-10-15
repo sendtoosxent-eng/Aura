@@ -23,6 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'registration_status',
         'registration_number',
         'password',
+        'two_factor_enabled',
     ];
 
     protected $hidden = [
@@ -37,6 +38,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
             'password' => 'hashed',
+            'two_factor_enabled' => 'boolean',
         ];
     }
 
@@ -59,6 +61,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(
             TrustedLogin::class
         );
+    }
+
+    public function loginVerifications(): HasMany
+    {
+        return $this->hasMany(LoginVerification::class);
     }
 
     public function registrationApplications(): HasMany

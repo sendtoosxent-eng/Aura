@@ -35,16 +35,12 @@ struct ProviderThumbnail: View {
     }
 
     private var placeholder: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppColor.primaryFixed, AppColor.surfaceHigh],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Image(systemName: provider.type.icon)
-                .font(.system(size: iconSize))
-                .foregroundStyle(AppColor.primary.opacity(0.8))
-        }
+        Image(provider.type == .pharmacy ? "WelcomePharmacy" : "WelcomeFacility")
+            .resizable()
+            .scaledToFill()
+            .overlay {
+                Color.black.opacity(0.08)
+            }
     }
 }
 

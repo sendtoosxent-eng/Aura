@@ -62,6 +62,10 @@ class ProviderLoginTestSeeder extends Seeder
 
                 'address' => 'Ntinda, Kampala',
 
+                'latitude' => 0.3543,
+
+                'longitude' => 32.6123,
+
                 'phone' => '+256700111222',
 
                 'email' => 'facility@afyalink.test',

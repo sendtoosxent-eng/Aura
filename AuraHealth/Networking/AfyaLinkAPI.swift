@@ -10,6 +10,7 @@ struct AuthProfileDTO: Decodable {
     let nin: String?
     let accountType: String
     let profileId: String
+    let profilePhotoUrl: URL?
     let registrationStatus: String?
     let requiresSecurityOtp: Bool?
     let twoFactorEnabled: Bool?
@@ -811,6 +812,7 @@ private extension AuthProfileDTO {
             personName: personName ?? name,
             handle: (personName ?? name).lowercased().replacingOccurrences(of: " ", with: "_"),
             profileID: profileId,
+            profilePhotoURL: profilePhotoUrl,
             phone: phone,
             email: email,
             nin: nin,

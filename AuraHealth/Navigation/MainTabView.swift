@@ -59,6 +59,9 @@ struct MainTabView: View {
                 onViewOffline: { showOffline = false }
             )
         }
+        .task {
+            await appState.loadDiscoveryIfNeeded()
+        }
     }
 }
 

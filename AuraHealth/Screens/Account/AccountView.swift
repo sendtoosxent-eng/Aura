@@ -1,12 +1,12 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 // SCREEN 10, Account (redesigned)
 // Full-bleed cover · profile card · Last visit + Health ID cards · grouped menu · logout · provider CTA
 struct AccountView: View {
     @Environment(AppState.self) private var appState
 
-    @State private var showEditProfile = false
     @State private var showComingSoon = false
     @State private var showRegistration = false
     @State private var showLogoutConfirm = false
@@ -85,9 +85,6 @@ struct AccountView: View {
         .background(AppColor.background.ignoresSafeArea())
         .ignoresSafeArea(edges: .top)
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showEditProfile) {
-            EditProfileSheet()
-        }
         .alert("Coming soon", isPresented: $showComingSoon) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -111,9 +108,17 @@ struct AccountView: View {
     private var coverHeaderSection: some View {
         GeometryReader { geometry in
             ZStack {
-                Image("WelcomeFacility")
-                    .resizable()
-                    .scaledToFill()
+                Group {
+                    if let data = appState.coverPhotoData, let image = UIImage(data: data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image("WelcomeFacility")
+                            .resizable()
+                            .scaledToFill()
+                    }
+                }
                     .frame(width: geometry.size.width, height: 210 + geometry.safeAreaInsets.top)
                     .clipped()
                     .overlay {
@@ -177,7 +182,7 @@ struct AccountView: View {
                 }
             }
 
-            Button { showEditProfile = true } label: {
+            NavigationLink(value: Route.editProfile) {
                 Label("Edit profile", systemImage: "pencil")
                     .font(AppFont.labelLg)
                     .foregroundStyle(AppColor.primary)
@@ -193,7 +198,11 @@ struct AccountView: View {
     /// Photo from Assets if it exists, otherwise initials.
     private var avatar: some View {
         Group {
-            if UIImage(named: "WelcomeCare") != nil {
+            if let data = appState.profilePhotoData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if UIImage(named: "WelcomeCare") != nil {
                 Image("WelcomeCare")
                     .resizable()
                     .scaledToFill()
@@ -401,20 +410,55 @@ private struct TrailingIconLabelStyle: LabelStyle {
     }
 }
 
-// MARK: - Edit Profile Sheet
+// MARK: - Edit Profile
 
 struct EditProfileSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var handle: String = ""
     @State private var phone: String = ""
-    @State private var healthID: String = ""
+    @State private var email: String = ""
+    @State private var ninPrefix = "CM"
+    @State private var ninBody = ""
+    @State private var profilePhotoItem: PhotosPickerItem?
+    @State private var coverPhotoItem: PhotosPickerItem?
+    @State private var profilePhotoData: Data?
+    @State private var coverPhotoData: Data?
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
+                Section("Photos") {
+                    PhotosPicker(selection: $coverPhotoItem, matching: .images) {
+                        ZStack {
+                            profileImage(data: coverPhotoData ?? appState.coverPhotoData, fallback: "WelcomeFacility")
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 130)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                            Label("Change cover photo", systemImage: "photo.badge.plus")
+                                .font(AppFont.labelLg)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, Spacing.md)
+                                .padding(.vertical, Spacing.sm)
+                                .background(.black.opacity(0.55), in: Capsule())
+                        }
+                    }
+
+                    PhotosPicker(selection: $profilePhotoItem, matching: .images) {
+                        HStack(spacing: Spacing.md) {
+                            profileImage(data: profilePhotoData ?? appState.profilePhotoData, fallback: "WelcomeCare")
+                                .frame(width: 72, height: 72)
+                                .clipShape(Circle())
+                            Label("Change profile photo", systemImage: "person.crop.circle.badge.plus")
+                                .font(AppFont.labelLg)
+                                .foregroundStyle(AppColor.primary)
+                        }
+                    }
+                }
+
                 Section("Personal Details") {
                     HStack {
                         Text("Full Name")
@@ -434,49 +478,205 @@ struct EditProfileSheet: View {
                     }
 
                     HStack {
-                        Text("Username")
+                        Text("Email")
                             .font(AppFont.labelLg)
                         Spacer()
-                        TextField("Username", text: $handle)
+                        TextField("Email address", text: $email)
+                            .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .multilineTextAlignment(.trailing)
                     }
 
-                    HStack {
-                        Text("Health ID")
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("National ID")
                             .font(AppFont.labelLg)
-                        Spacer()
-                        TextField("Enter health ID", text: $healthID)
-                            .multilineTextAlignment(.trailing)
+
+                        HStack(spacing: Spacing.sm) {
+                            Picker("NIN prefix", selection: $ninPrefix) {
+                                Text("CM").tag("CM")
+                                Text("CF").tag("CF")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 120)
+
+                            TextField("8 digits + 4 letters/numbers", text: ninBodyBinding)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .textContentType(.none)
+                        }
+
+                        Text("\(ninPrefix)\(ninBody) · \(ninBody.count)/12 characters")
+                            .font(AppFont.labelSm)
+                            .foregroundStyle(AppColor.onSurfaceVariant)
                     }
                 }
-            }
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+
+                Section("Account") {
+                    LabeledContent("Username", value: "@\(appState.userHandle)")
+                    LabeledContent("Health ID", value: appState.healthID)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        appState.userName = name
-                        appState.userHandle = handle
-                        appState.userPhone = phone
-                        appState.healthID = healthID
-                        dismiss()
+
+                if let saveError {
+                    Section {
+                        Label(saveError, systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(AppColor.primary)
                     }
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(AppColor.primary)
                 }
+        }
+        .navigationTitle("Edit Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
             }
-            .onAppear {
-                name = appState.userName
-                handle = appState.userHandle
-                phone = appState.userPhone
-                healthID = appState.healthID
+            ToolbarItem(placement: .confirmationAction) {
+                Button(isSaving ? "Saving…" : "Save") {
+                    Task { await save() }
+                }
+                .disabled(isSaving)
+                .font(.body.weight(.bold))
+                .foregroundStyle(AppColor.primary)
             }
         }
+        .onAppear {
+            name = appState.userName
+            phone = appState.userPhone
+            email = appState.userEmail
+            setNIN(appState.userNIN)
+        }
+        .onChange(of: profilePhotoItem) { _, item in
+            loadImage(from: item) { profilePhotoData = $0 }
+        }
+        .onChange(of: coverPhotoItem) { _, item in
+            loadImage(from: item) { coverPhotoData = $0 }
+        }
+    }
+
+    private func profileImage(data: Data?, fallback: String) -> some View {
+        Group {
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(fallback)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+    }
+
+    private var ninBodyBinding: Binding<String> {
+        Binding(
+            get: { ninBody },
+            set: { ninBody = sanitizedNINBody($0) }
+        )
+    }
+
+    private func setNIN(_ value: String) {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized.hasPrefix("CF") {
+            ninPrefix = "CF"
+        } else {
+            ninPrefix = "CM"
+        }
+        ninBody = sanitizedNINBody(String(normalized.dropFirst(min(2, normalized.count))))
+    }
+
+    private func sanitizedNINBody(_ value: String) -> String {
+        var result = ""
+        for character in value.uppercased() where result.count < 12 {
+            if result.count < 8 {
+                guard character.isNumber else { continue }
+            } else {
+                guard character.isLetter || character.isNumber else { continue }
+            }
+            result.append(character)
+        }
+        return result
+    }
+
+    private func loadImage(from item: PhotosPickerItem?, completion: @escaping (Data) -> Void) {
+        guard let item else { return }
+        Task {
+            guard let source = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: source),
+                  let jpeg = image.jpegData(compressionQuality: 0.85) else { return }
+            completion(jpeg)
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard let request = validatedRequest() else { return }
+
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+
+        do {
+            try await appState.updatePatientProfile(request)
+            dismiss()
+        } catch {
+            saveError = error.localizedDescription
+        }
+    }
+
+    private func validatedRequest() -> PatientProfileUpdateRequest? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPhone = phone.filter { !$0.isWhitespace }
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedNIN = ninPrefix + ninBody
+
+        guard !trimmedName.isEmpty else {
+            saveError = "Enter your full name."
+            return nil
+        }
+        guard normalizedPhone.range(of: #"^\+2567\d{8}$"#, options: .regularExpression) != nil else {
+            saveError = "Enter a valid Ugandan mobile number, such as +256770123456."
+            return nil
+        }
+        guard normalizedEmail.range(
+            of: #"^[^\s@]+@[^\s@]+\.[^\s@]+$"#,
+            options: .regularExpression
+        ) != nil else {
+            saveError = "Enter a valid email address."
+            return nil
+        }
+        guard normalizedNIN.range(
+            of: #"^C[MF][0-9]{8}[A-Z0-9]{4}$"#,
+            options: .regularExpression
+        ) != nil else {
+            saveError = "Complete your NIN with 8 digits followed by 4 letters or numbers."
+            return nil
+        }
+
+        let patient = appState.patientProfile
+        return PatientProfileUpdateRequest(
+            name: trimmedName,
+            phone: normalizedPhone,
+            email: normalizedEmail,
+            nin: normalizedNIN,
+            dateOfBirth: patient?.dateOfBirth ?? "",
+            gender: patient?.gender?.capitalized ?? "",
+            profilePhoto: profilePhotoData,
+            coverPhoto: coverPhotoData,
+            bloodGroup: patient?.bloodGroup ?? "",
+            systolic: patient?.systolic.map { String($0) } ?? "",
+            diastolic: patient?.diastolic.map { String($0) } ?? "",
+            heartRate: patient?.heartRate.map { String($0) } ?? "",
+            heightCm: patient?.heightCm.map { String($0) } ?? "",
+            weightKg: patient?.weightKg.map { String($0) } ?? "",
+            allergies: patient?.allergies ?? "",
+            chronicConditions: patient?.chronicConditions ?? "",
+            currentMedications: patient?.currentMedications ?? "",
+            emergencyContactName: patient?.emergencyContactName ?? "",
+            emergencyContactRelationship: patient?.emergencyContactRelationship ?? "",
+            emergencyContactPhone: patient?.emergencyContactPhone ?? "",
+            healthDataConsent: patient?.healthDataConsent ?? false
+        )
     }
 }
 

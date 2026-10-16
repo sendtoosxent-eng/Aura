@@ -8,6 +8,10 @@ enum AppConfig {
     static let brand = "AfyaLink"
     static let fullName = "AfyaLink Uganda"
 
+    // Enable after the App ID and provisioning profiles include the
+    // Push Notifications capability in the Apple Developer portal.
+    static let remotePushNotificationsEnabled = false
+
     /// Override this at runtime with the `AFYALINK_API_BASE_URL` environment
     /// variable when testing against a backend on another computer/device.
     static var apiBaseURL: URL {

@@ -234,11 +234,7 @@ struct LoginView: View {
     private func passwordForm(_ profile: AuthProfile) -> some View {
         VStack(spacing: Spacing.md) {
             HStack(spacing: Spacing.md) {
-                Text(profile.initials)
-                    .font(.title3.bold())
-                    .foregroundStyle(AppColor.primary)
-                    .frame(width: 56, height: 56)
-                    .background(AppColor.primaryTint, in: Circle())
+                profileAvatar(profile, size: 56)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(profile.name)
@@ -309,11 +305,7 @@ struct LoginView: View {
     private func profileConfirmation(_ profile: AuthProfile) -> some View {
         VStack(spacing: Spacing.md) {
             VStack(spacing: Spacing.sm) {
-                Text(profile.initials)
-                    .font(.title.bold())
-                    .foregroundStyle(AppColor.primary)
-                    .frame(width: 76, height: 76)
-                    .background(AppColor.primaryTint, in: Circle())
+                profileAvatar(profile, size: 76)
                 Text(profile.name)
                     .font(AppFont.headlineLg)
                     .foregroundStyle(AppColor.onSurface)
@@ -337,6 +329,26 @@ struct LoginView: View {
                 resetLookup()
             }
         }
+    }
+
+    private func profileAvatar(_ profile: AuthProfile, size: CGFloat) -> some View {
+        AsyncImage(url: profile.profilePhotoURL) { phase in
+            if let image = phase.image {
+                image
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(profile.initials)
+                    .font(size > 60 ? .title.bold() : .title3.bold())
+                    .foregroundStyle(AppColor.primary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(AppColor.primaryTint)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(AppColor.surface, lineWidth: 2))
+        .accessibilityLabel("Profile photo for \(profile.name)")
     }
 
     private func findProfile() {

@@ -37,3 +37,5 @@ services:
         value: local
       - key: AFYALINK_SMS_DRIVER
         value: log
+      - key: AFYALINK_SEED_DEMO_DATA
+        value: "true"

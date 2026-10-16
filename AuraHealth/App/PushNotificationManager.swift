@@ -24,6 +24,7 @@ final class PushNotificationManager {
     }
 
     func registerWithAppleIfAuthorized() async {
+        guard AppConfig.remotePushNotificationsEnabled else { return }
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) else { return }
         UIApplication.shared.registerForRemoteNotifications()

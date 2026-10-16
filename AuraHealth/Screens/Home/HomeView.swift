@@ -69,6 +69,9 @@ struct HomeView: View {
                     chipRow
 
                     providersHeader
+                    if let discoveryError = appState.discoveryErrorMessage {
+                        discoveryErrorCard(discoveryError)
+                    }
                     listContent
 
                     doctorsPreview
@@ -155,11 +158,16 @@ struct HomeView: View {
         .shadow(color: AppColor.primary.opacity(0.25), radius: 10, y: 5)
     }
 
-    /// Photo from Assets if it exists, otherwise initials. Green dot = active.
+    /// Signed-in profile photo, then the bundled placeholder, then initials.
+    /// Green dot = active.
     private var avatar: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
-                if UIImage(named: "WelcomeCare") != nil {
+                if let data = appState.profilePhotoData, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else if UIImage(named: "WelcomeCare") != nil {
                     Image("WelcomeCare")
                         .resizable()
                         .scaledToFill()
@@ -240,6 +248,28 @@ struct HomeView: View {
                     .foregroundStyle(AppColor.onSurfaceVariant)
             }
         }
+    }
+
+    private func discoveryErrorCard(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Image(systemName: "wifi.exclamationmark")
+                .foregroundStyle(AppColor.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Live provider data is unavailable")
+                    .font(AppFont.labelLg)
+                Text(message)
+                    .font(AppFont.bodyMd)
+                    .foregroundStyle(AppColor.onSurfaceVariant)
+                Button("Retry") {
+                    Task { await appState.loadDiscoveryIfNeeded() }
+                }
+                .font(AppFont.labelLg)
+                .foregroundStyle(AppColor.primary)
+            }
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppColor.primaryTint, in: RoundedRectangle(cornerRadius: Radius.md))
     }
 
     // MARK: - Alerts

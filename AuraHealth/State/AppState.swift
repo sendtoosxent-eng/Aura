@@ -126,6 +126,7 @@ final class AppState {
     var patientProfile: PatientAuthProfile?
     var profilePhotoData: Data?
     var coverPhotoData: Data?
+    var discoveryErrorMessage: String?
 
     // MARK: Network
     let network = NetworkMonitor()
@@ -203,13 +204,13 @@ final class AppState {
         time: String,
         reason: String
     ) async throws {
-        guard let providerID = backendProviderIDs[provider.id] else {
-            throw APIError.server(status: 422, message: "This demo facility is not linked to the backend yet.")
+        guard let providerID = provider.backendID ?? backendProviderIDs[provider.id] else {
+            throw APIError.transport("Facility data is unavailable. Check that the AfyaLink backend is running, then refresh providers.")
         }
 
         let request = CreateAppointmentRequest(
             healthcareProviderId: providerID,
-            doctorId: doctor.flatMap { backendDoctorIDs[$0.id] },
+            doctorId: doctor.flatMap { $0.backendID ?? backendDoctorIDs[$0.id] },
             appointmentDate: Self.apiDateFormatter.string(from: date),
             appointmentTime: Self.twentyFourHourTime(time),
             service: service,
@@ -236,8 +237,8 @@ final class AppState {
     }
 
     func unavailableDates(for provider: Provider, month: Date) async throws -> [ProviderUnavailableDate] {
-        guard let providerID = backendProviderIDs[provider.id] else {
-            throw APIError.server(status: 422, message: "This facility is not linked to the backend yet.")
+        guard let providerID = provider.backendID ?? backendProviderIDs[provider.id] else {
+            throw APIError.transport("Facility data is unavailable. Check that the AfyaLink backend is running, then refresh providers.")
         }
         let values = try await api.providerAvailability(
             providerID: providerID,
@@ -293,33 +294,36 @@ final class AppState {
         Task { try? await api.markThreadRead(backendID) }
     }
 
-    func sendMessage(_ text: String, to participantName: String) {
+    func sendMessage(_ text: String, to participantName: String) async throws {
         let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanText.isEmpty else { return }
 
-        Task {
-            do {
-                if let index = messageThreads.firstIndex(where: { $0.participantName == participantName }),
-                   let threadID = messageThreads[index].backendID {
-                    let dto = try await api.sendMessage(threadID: threadID, text: cleanText)
-                    await MainActor.run { messageThreads[index].messages.append(dto.message) }
-                    return
-                }
-
-                let providerID = allProviders.first(where: { $0.name == participantName })
-                    .flatMap { backendProviderIDs[$0.id] }
-                let doctorID = allDoctors.first(where: { $0.name == participantName })
-                    .flatMap { backendDoctorIDs[$0.id] }
-                let dto = try await api.startConversation(
-                    providerID: providerID,
-                    doctorID: doctorID,
-                    text: cleanText
-                )
-                await MainActor.run { messageThreads.insert(dto.thread, at: 0) }
-            } catch {
-                // The conversation remains unchanged when the server rejects a send.
+        if let threadID = messageThreads.first(where: { $0.participantName == participantName })?.backendID {
+            let dto = try await api.sendMessage(threadID: threadID, text: cleanText)
+            await MainActor.run {
+                guard let index = messageThreads.firstIndex(where: { $0.backendID == threadID }) else { return }
+                messageThreads[index].messages.append(dto.message)
             }
+            return
         }
+
+        let provider = allProviders.first(where: { $0.name == participantName })
+        let doctor = allDoctors.first(where: { $0.name == participantName })
+        let providerID = provider.flatMap { $0.backendID ?? backendProviderIDs[$0.id] }
+        let doctorID = doctor.flatMap { $0.backendID ?? backendDoctorIDs[$0.id] }
+        guard providerID != nil || doctorID != nil else {
+            throw APIError.server(
+                status: 422,
+                message: "This provider is not connected to live messaging yet. Choose a provider loaded from AfyaLink and try again."
+            )
+        }
+
+        let dto = try await api.startConversation(
+            providerID: providerID,
+            doctorID: doctorID,
+            text: cleanText
+        )
+        await MainActor.run { messageThreads.insert(dto.thread, at: 0) }
     }
 
     func markNotificationRead(_ notification: NotificationItem) {
@@ -435,6 +439,12 @@ final class AppState {
         healthID = profile.profileID
         twoFactorEnabled = profile.twoFactorEnabled
         patientProfile = profile.patientProfile
+        profilePhotoData = nil
+        coverPhotoData = nil
+
+        if let profilePhotoURL = profile.profilePhotoURL {
+            Task { await loadProfilePhoto(from: profilePhotoURL) }
+        }
 
         if let patient = profile.patientProfile {
             emergencyHealthProfile = EmergencyHealthProfile(
@@ -483,6 +493,17 @@ final class AppState {
             providerHours = provider.open24Hours ? "Open 24 hours, every day" : "Set operating hours in Practice"
             providerServices = Set(provider.services.compactMap(CareService.init(rawValue:)))
         }
+    }
+
+    @MainActor
+    private func loadProfilePhoto(from url: URL) async {
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode),
+              !data.isEmpty else {
+            return
+        }
+        profilePhotoData = data
     }
 
     @MainActor
@@ -601,10 +622,12 @@ final class AppState {
             }
             allDoctors = doctors
             backendDoctorIDs = doctorIDs
+            discoveryErrorMessage = nil
         } catch {
             // Keep the bundled discovery data available while the local server
             // is offline. Auth and booking still surface their network errors.
             hasLoadedDiscovery = false
+            discoveryErrorMessage = error.localizedDescription
         }
     }
 
@@ -639,9 +662,11 @@ final class AppState {
     /// Sends a normal message (the caption shows in the conversation list preview)
     /// and attaches the file to that message.
     func sendAttachment(_ attachment: ChatAttachment, caption: String, to name: String) {
-        sendMessage(caption, to: name)
-        if let id = thread(named: name)?.messages.last?.id {
-            attachments[id] = attachment
+        Task {
+            try? await sendMessage(caption, to: name)
+            if let id = thread(named: name)?.messages.last?.id {
+                attachments[id] = attachment
+            }
         }
     }
 }
@@ -825,7 +850,8 @@ private extension ProviderDTO {
             longitude: lon,
             services: services,
             isVerified: verified,
-            imageURL: AppConfig.serverAssetURL(image)
+            imageURL: AppConfig.serverAssetURL(image),
+            backendID: id
         )
     }
 }
@@ -841,7 +867,8 @@ private extension DoctorDTO {
             isAvailableNow: true,
             provider: provider,
             latitude: latitude ?? provider.latitude,
-            longitude: longitude ?? provider.longitude
+            longitude: longitude ?? provider.longitude,
+            backendID: id
         )
     }
 }

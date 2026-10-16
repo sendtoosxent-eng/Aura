@@ -8,6 +8,7 @@ struct AuthProfile: Equatable {
     let personName: String
     let handle: String
     let profileID: String
+    let profilePhotoURL: URL?
     let phone: String
     let email: String?
     let nin: String?
@@ -189,6 +190,7 @@ struct Provider: Identifiable, Hashable {
     let services: [String]
     var isVerified: Bool = true
     var imageURL: URL? = nil
+    var backendID: Int? = nil
 
     // LEARN: Computed properties — calculated every time you read them.
     var coordinate: CLLocationCoordinate2D {
@@ -237,6 +239,7 @@ struct CareDoctor: Identifiable, Hashable {
     let provider: Provider
     let latitude: Double
     let longitude: Double
+    var backendID: Int? = nil
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)

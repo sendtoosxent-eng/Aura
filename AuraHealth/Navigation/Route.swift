@@ -11,6 +11,7 @@ import SwiftUI
 // =============================================================================
 enum Route: Hashable {
     case provider(Provider)
+    case editProfile
     case notifications
     case myReviews
     case favorites
@@ -33,6 +34,8 @@ extension View {
             switch route {
             case .provider(let provider):
                 ProviderProfileView(provider: provider)
+            case .editProfile:
+                EditProfileSheet()
             case .notifications:
                 NotificationsView()
             case .myReviews:

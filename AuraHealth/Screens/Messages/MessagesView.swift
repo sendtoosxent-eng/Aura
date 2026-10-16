@@ -63,6 +63,7 @@ struct MessagesView: View {
         }
         .background(AppColor.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .task { await appState.loadMobileData() }
     }
 
     private func threadRow(_ thread: MessageThread) -> some View {
@@ -580,8 +581,15 @@ struct ConversationView: View {
     }
 
     private func sendText() {
-        appState.sendMessage(draft, to: participantName)
-        draft = ""
+        let message = draft
+        Task {
+            do {
+                try await appState.sendMessage(message, to: participantName)
+                draft = ""
+            } catch {
+                alertMessage = error.localizedDescription
+            }
+        }
     }
 
     private func finishRecording() {

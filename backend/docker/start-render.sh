@@ -28,6 +28,9 @@ if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
 fi
 
 php artisan migrate --force
+if [ "${AFYALINK_SEED_DEMO_DATA:-false}" = "true" ]; then
+    php artisan db:seed --class=ProviderLoginTestSeeder --force
+fi
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
